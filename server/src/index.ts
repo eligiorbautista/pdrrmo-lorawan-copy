@@ -7,12 +7,23 @@ import { handleOpen, handleClose } from "@/ws/handler";
 import { initGateway } from "@/lib/gateway";
 import type { GatewayConfig } from "@/lib/gateway";
 
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `Missing required environment variable: ${name}\n` +
+        `Please copy server/.env.example to server/.env and fill in your values.`,
+    );
+  }
+  return value;
+}
+
 const app = new Hono();
 
 // CORS for PWA frontend
-const corsOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(",").map((s) => s.trim())
-  : ["http://localhost:5173", "http://localhost:4173"];
+const corsOrigins = requireEnv("CORS_ORIGINS")
+  .split(",")
+  .map((s) => s.trim());
 
 app.use(
   "*",
@@ -42,8 +53,8 @@ app.get("/api/ws", (c) => {
   return c.json({ error: "Expected WebSocket upgrade" }, 400);
 });
 
-const port = Number(process.env.PORT ?? "3000");
-const host = process.env.HOST ?? "0.0.0.0";
+const port = Number(requireEnv("PORT"));
+const host = requireEnv("HOST");
 
 const server = Bun.serve({
   port,

@@ -1,6 +1,17 @@
 import { Database } from "bun:sqlite";
 
-const DB_PATH = process.env.DB_PATH ?? "./pdrrmo.db";
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `Missing required environment variable: ${name}\n` +
+        `Please copy server/.env.example to server/.env and fill in your values.`,
+    );
+  }
+  return value;
+}
+
+const DB_PATH = requireEnv("DB_PATH");
 
 export const db = new Database(DB_PATH);
 
