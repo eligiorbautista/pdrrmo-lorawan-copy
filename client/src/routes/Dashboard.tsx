@@ -16,7 +16,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { AlertCard } from "@/components/AlertCard";
 import { PageWrapper, StatCard, ContentPanel } from "@/components/PageWrapper";
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:3000/api/ws";
+import { ENV } from "@/lib/env";
 
 export function Dashboard() {
   const nodes = useDeviceStore((s) => s.nodes);
@@ -25,7 +25,7 @@ export function Dashboard() {
   const isBtConnected = useDeviceStore((s) => s.phase === "configured");
 
   // Connect to backend for real-time updates
-  const ws = useWebSocket({ url: WS_URL, enabled: true });
+  const ws = useWebSocket({ url: ENV.WS_URL, enabled: true });
 
   const activeAlerts = useMemo(
     () =>

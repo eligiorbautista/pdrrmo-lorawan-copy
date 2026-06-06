@@ -12,14 +12,14 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { AlertCard } from "@/components/AlertCard";
 import { PageWrapper, ContentPanel } from "@/components/PageWrapper";
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:3000/api/ws";
+import { ENV } from "@/lib/env";
 
 export function Dispatch() {
   const alerts = useMessageStore((s) => s.alerts);
   const updateAlert = useMessageStore((s) => s.updateAlert);
 
   // Connect to backend for real-time alert dispatch
-  const ws = useWebSocket({ url: WS_URL, enabled: true });
+  const ws = useWebSocket({ url: ENV.WS_URL, enabled: true });
 
   const active = useMemo(
     () => alerts.filter((a) => a.status !== "resolved"),
@@ -53,7 +53,7 @@ export function Dispatch() {
     updateAlert(id, { status: "acked" });
 
     // Notify backend via fetch
-    fetch(`${WS_URL.replace("/api/ws", "/api/alerts")}/${id}/status`, {
+    fetch(`${ENV.API_URL}/alerts/${id}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "acknowledged" }),
@@ -63,7 +63,7 @@ export function Dispatch() {
   const handleResolve = (id: string) => {
     updateAlert(id, { status: "resolved" });
 
-    fetch(`${WS_URL.replace("/api/ws", "/api/alerts")}/${id}/status`, {
+    fetch(`${ENV.API_URL}/alerts/${id}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "resolved" }),

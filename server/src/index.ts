@@ -10,10 +10,14 @@ import type { GatewayConfig } from "@/lib/gateway";
 const app = new Hono();
 
 // CORS for PWA frontend
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",").map((s) => s.trim())
+  : ["http://localhost:5173", "http://localhost:4173"];
+
 app.use(
   "*",
   cors({
-    origin: ["http://localhost:5173", "http://localhost:4173", "*"],
+    origin: corsOrigins,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
   }),

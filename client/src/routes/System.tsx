@@ -15,13 +15,13 @@ import { useDeviceStore } from "@/store/deviceStore";
 import { useMessageStore } from "@/store/messageStore";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:3000/api/ws";
+import { ENV } from "@/lib/env";
 
 export function System() {
   const nodes = useDeviceStore((s) => s.nodes);
   const messages = useMessageStore((s) => s.messages);
   const alerts = useMessageStore((s) => s.alerts);
-  const ws = useWebSocket({ url: WS_URL, enabled: true });
+  const ws = useWebSocket({ url: ENV.WS_URL, enabled: true });
 
   const [baseTime] = useState(() => Date.now());
 
