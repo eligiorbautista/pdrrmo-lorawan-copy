@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Megaphone, Check, Loader, Send } from "lucide-react";
 import { useMessages } from "@/hooks/useMessages";
 import { useMessageStore } from "@/store/messageStore";
 import { useDeviceStore } from "@/store/deviceStore";
@@ -44,18 +45,21 @@ export function MessageThread() {
 
   if (!isConnected) {
     return (
-      <div className="rounded-xl bg-gray-900 border border-white/10 p-6 text-center text-white/40 text-sm">
+      <div className="rounded-xl bg-surface-2 border border-default p-6 text-center text-tertiary text-sm">
         Connect to a Meshtastic device to send and receive messages.
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full rounded-xl bg-gray-900 border border-white/10 overflow-hidden">
+    <div className="flex flex-col h-full rounded-xl bg-surface-2 border border-default overflow-hidden">
       {/* Destination selector */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/10 bg-gray-800/50">
-        <label className="text-xs text-white/50">To:</label>
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-subtle bg-surface-1/50">
+        <label htmlFor="msg-dest" className="text-xs text-tertiary font-medium">
+          To:
+        </label>
         <select
+          id="msg-dest"
           value={
             destination === "broadcast" ? "broadcast" : destination.toString()
           }
@@ -66,7 +70,7 @@ export function MessageThread() {
                 : Number(e.target.value),
             )
           }
-          className="bg-gray-800 text-white text-xs rounded px-2 py-1 border border-white/10 focus:outline-none focus:border-mesh-blue/50"
+          className="bg-surface-1 text-primary text-xs rounded-lg px-2.5 py-1.5 border border-default focus:outline-none focus:border-info focus:ring-1 focus:ring-info/30"
         >
           <option value="broadcast">Broadcast (All Nodes)</option>
           {Array.from(useDeviceStore.getState().nodes.values()).map((node) => (
@@ -83,7 +87,7 @@ export function MessageThread() {
         className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[300px] max-h-[60vh]"
       >
         {messages.length === 0 && (
-          <div className="text-center text-white/30 text-sm py-8">
+          <div className="text-center text-tertiary text-sm py-8">
             No messages yet. Send your first message below.
           </div>
         )}
@@ -97,7 +101,7 @@ export function MessageThread() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-white/10 p-3 bg-gray-800/50">
+      <div className="border-t border-subtle p-3 bg-surface-1/50">
         <div className="flex gap-2">
           <textarea
             value={input}
@@ -105,14 +109,16 @@ export function MessageThread() {
             onKeyDown={handleKeyDown}
             placeholder="Type a message…"
             rows={2}
-            className="flex-1 bg-gray-800 text-white text-sm rounded-lg px-3 py-2 border border-white/10 resize-none focus:outline-none focus:border-mesh-blue/50 placeholder-white/30"
+            className="flex-1 bg-surface-1 text-primary text-sm rounded-lg px-3 py-2.5 border border-default resize-none focus:outline-none focus:border-info focus:ring-1 focus:ring-info/30 placeholder:text-tertiary transition-all"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim()}
-            className="px-4 py-2 bg-mesh-green hover:bg-mesh-green/80 disabled:opacity-30 text-white text-sm font-medium rounded-lg transition-colors self-end"
+            className="touch-target-sm px-4 py-2 bg-mesh hover:bg-mesh/90 disabled:opacity-30 disabled:cursor-not-allowed text-surface-0 text-sm font-medium rounded-lg transition-colors self-end inline-flex items-center gap-1.5"
+            aria-label="Send message"
           >
-            Send
+            <Send className="w-4 h-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Send</span>
           </button>
         </div>
       </div>
@@ -133,28 +139,45 @@ function MessageBubble({
     <div className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
       <div
         className={`
-          max-w-[85%] rounded-xl px-4 py-2 text-sm
+          max-w-[85%] rounded-xl px-4 py-2.5 text-sm
           ${isOwn
-            ? "bg-mesh-blue/20 text-white rounded-br-sm"
-            : "bg-white/5 text-white rounded-bl-sm border border-white/5"}
+            ? "bg-info/10 text-primary rounded-br-sm border border-info/20"
+            : "bg-surface-1 text-primary rounded-bl-sm border border-default"}
         `}
       >
         {!isOwn && (
-          <div className="text-xs text-white/50 mb-1">
+          <div className="text-xs text-tertiary mb-1">
             From: {nodeLabel(message.from)}
           </div>
         )}
         <p className="whitespace-pre-wrap break-words">{message.text}</p>
-        <div className="flex items-center gap-2 mt-1 text-xs text-white/30">
+        <div className="flex items-center gap-2 mt-1.5 text-xs text-tertiary">
           <span>
             {message.timestamp.toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
             })}
           </span>
-          {isBroadcast && <span>📢 Broadcast</span>}
+          {isBroadcast && (
+            <span className="inline-flex items-center gap-1">
+              <Megaphone className="w-3 h-3" aria-hidden="true" />
+              Broadcast
+            </span>
+          )}
           {isOwn && (
-            <span>{message.acked ? "✓ Delivered" : "⏳ Sending"}</span>
+            <span className="inline-flex items-center gap-1">
+              {message.acked ? (
+                <>
+                  <Check className="w-3 h-3 text-mesh" aria-hidden="true" />
+                  <span className="text-mesh">Delivered</span>
+                </>
+              ) : (
+                <>
+                  <Loader className="w-3 h-3 animate-spin" aria-hidden="true" />
+                  Sending
+                </>
+              )}
+            </span>
           )}
         </div>
       </div>

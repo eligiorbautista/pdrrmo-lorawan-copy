@@ -1,7 +1,16 @@
 import { useMemo } from "react";
+import {
+  Bell,
+  AlertTriangle,
+  AlertOctagon,
+  Info,
+  CheckCircle,
+  ShieldAlert,
+} from "lucide-react";
 import { useMessageStore } from "@/store/messageStore";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { AlertCard } from "@/components/AlertCard";
+import { PageWrapper, ContentPanel } from "@/components/PageWrapper";
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:3000/api/ws";
 
@@ -62,46 +71,50 @@ export function Dispatch() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-4 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-white">Alert Dispatch</h2>
-          <p className="text-sm text-white/50 mt-1">
-            Manage incoming emergency alerts and coordinate responses
-          </p>
-        </div>
+    <PageWrapper
+      title="Alert Dispatch"
+      subtitle="Manage incoming emergency alerts and coordinate responses"
+      icon={Bell}
+      action={
         <div className="flex items-center gap-2">
           <span
-            className={`inline-block w-2 h-2 rounded-full ${ws.connected ? "bg-green-500" : "bg-red-500"}`}
+            className={`inline-block w-2 h-2 rounded-full ${ws.connected ? "bg-mesh" : "bg-emergency"}`}
+            aria-hidden="true"
           />
-          <span className="text-xs text-white/50">
+          <span className="text-xs text-tertiary hidden sm:inline">
             {ws.connected ? "Live" : "Disconnected"}
           </span>
         </div>
-      </div>
-
+      }
+    >
       {/* Alert severity counts */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-5 md:gap-8 pb-4 md:pb-6">
         <SeverityBadge
           label="EMERGENCY"
           count={counts.emergency}
-          color="red"
+          tone="emergency"
         />
-        <SeverityBadge label="URGENT" count={counts.urgent} color="orange" />
-        <SeverityBadge label="INFO" count={counts.info} color="blue" />
+        <SeverityBadge
+          label="URGENT"
+          count={counts.urgent}
+          tone="urgent"
+        />
+        <SeverityBadge
+          label="INFO"
+          count={counts.info}
+          tone="info"
+        />
       </div>
 
       {/* Active alerts */}
-      <section>
-        <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wide mb-3">
-          Active Alerts ({active.length})
-        </h3>
+      <ContentPanel title={`Active Alerts (${active.length})`} icon={ShieldAlert}>
         {active.length === 0 ? (
-          <div className="rounded-xl bg-gray-900 border border-white/10 p-8 text-center text-white/30">
-            <div className="text-4xl mb-2">✅</div>
-            <p className="text-lg">No active alerts</p>
-            <p className="text-sm mt-1">
+          <div className="flex flex-col items-center justify-center py-10 md:py-12 text-center">
+            <div className="w-14 h-14 rounded-full bg-mesh/10 border border-mesh/20 flex items-center justify-center text-mesh mb-3">
+              <CheckCircle className="w-7 h-7" aria-hidden="true" />
+            </div>
+            <p className="text-lg font-semibold text-primary">No active alerts</p>
+            <p className="text-sm text-tertiary mt-1 max-w-xs">
               All clear — no emergencies to respond to.
             </p>
           </div>
@@ -122,53 +135,64 @@ export function Dispatch() {
               ))}
           </div>
         )}
-      </section>
+      </ContentPanel>
 
       {/* Resolved alerts history */}
       {resolved.length > 0 && (
-        <section>
-          <h3 className="text-sm font-semibold text-white/40 uppercase tracking-wide mb-3">
-            Resolved ({resolved.length})
-          </h3>
-          <div className="space-y-2 opacity-50">
+        <ContentPanel
+          title={`Resolved (${resolved.length})`}
+          icon={CheckCircle}
+          action={
+            <span className="text-xs text-tertiary">Last 10 shown</span>
+          }
+        >
+          <div className="space-y-2 opacity-60">
             {resolved.slice(0, 10).map((alert) => (
               <AlertCard key={alert.id} alert={alert} />
             ))}
           </div>
-        </section>
+        </ContentPanel>
       )}
-    </div>
+    </PageWrapper>
   );
 }
 
 function SeverityBadge({
   label,
   count,
-  color,
+  tone,
 }: {
   label: string;
   count: number;
-  color: "red" | "orange" | "blue";
+  tone: "emergency" | "urgent" | "info";
 }) {
-  const colorMap = {
-    red: "bg-red-950/30 border-red-800/30 text-red-300",
-    orange: "bg-orange-950/30 border-orange-800/30 text-orange-300",
-    blue: "bg-blue-950/30 border-blue-800/30 text-blue-300",
+  const toneClasses = {
+    emergency: {
+      wrapper: "bg-emergency/5 border-emergency/20 text-emergency",
+      icon: AlertOctagon,
+    },
+    urgent: {
+      wrapper: "bg-warn/5 border-warn/20 text-warn",
+      icon: AlertTriangle,
+    },
+    info: {
+      wrapper: "bg-info/5 border-info/20 text-info",
+      icon: Info,
+    },
   };
 
-  const icons = {
-    red: "🚨",
-    orange: "⚠️",
-    blue: "ℹ️",
-  };
+  const style = toneClasses[tone];
+  const Icon = style.icon;
 
   return (
     <div
-      className={`rounded-xl p-3 border text-center ${colorMap[color]}`}
+      className={`rounded-xl p-3 md:p-4 border text-center transition-all hover:border-strong ${style.wrapper}`}
     >
-      <div className="text-xl mb-1">{icons[color]}</div>
-      <p className="text-2xl font-bold">{count}</p>
-      <p className="text-xs opacity-70 mt-1">{label}</p>
+      <div className="flex items-center justify-center mb-1.5 md:mb-2">
+        <Icon className="w-5 h-5 md:w-6 md:h-6" aria-hidden="true" />
+      </div>
+      <p className="text-2xl-fluid font-bold">{count}</p>
+      <p className="text-xs text-current opacity-70 mt-1">{label}</p>
     </div>
   );
 }

@@ -1,15 +1,24 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import {
+  X,
+  Menu,
+  RadioOff,
+  Loader,
+} from "lucide-react";
 import { useDeviceStore } from "@/store/deviceStore";
 import { useMeshtastic } from "@/hooks/useMeshtastic";
 import type { MeshNode } from "@/lib/types";
 
+
 // Helper to create glowing pulsing custom HTML pins for Leaflet
 const createCustomMarkerIcon = (isMe: boolean, shortName: string) => {
-  const colorClass = isMe ? "bg-blue-600 border-white text-white" : "bg-green-600 border-white text-white";
-  const pulseClass = isMe ? "bg-blue-400" : "bg-green-400";
-  
+  const colorClass = isMe
+    ? "bg-blue-500 border-white text-white"
+    : "bg-emerald-500 border-white text-white";
+  const pulseClass = isMe ? "bg-blue-400" : "bg-emerald-400";
+
   return L.divIcon({
     className: "custom-div-icon",
     html: `
@@ -40,36 +49,45 @@ export function Map() {
 
   const [selectedNodeNum, setSelectedNodeNum] = useState<number | null>(null);
 
-  // Get nodes that have valid GPS positions
-  const nodesWithPositions = useMemo(() => {
-    return Array.from(nodes.values()).filter(
-      (node) =>
-        node.position &&
-        typeof node.position.latitude === "number" &&
-        typeof node.position.longitude === "number" &&
-        !isNaN(node.position.latitude) &&
-        !isNaN(node.position.longitude) &&
-        node.position.latitude !== 0 &&
-        node.position.longitude !== 0
+  // Get the user's own node
+  const myNode = useMemo(() => {
+    if (myNodeNum === null) return null;
+    return nodes.get(myNodeNum) ?? null;
+  }, [nodes, myNodeNum]);
+
+  // Check if a node has a valid GPS position
+  const hasValidPosition = (node: MeshNode | null): boolean => {
+    if (!node?.position) return false;
+    const lat = node.position.latitude;
+    const lng = node.position.longitude;
+    return (
+      typeof lat === "number" &&
+      typeof lng === "number" &&
+      !isNaN(lat) &&
+      !isNaN(lng) &&
+      lat !== 0 &&
+      lng !== 0
     );
+  };
+
+  // Get nodes that have valid GPS positions (excluding my node for average)
+  const nodesWithPositions = useMemo(() => {
+    return Array.from(nodes.values()).filter((node) => hasValidPosition(node));
   }, [nodes]);
 
   // Get nodes that DO NOT have valid GPS positions
   const nodesWithoutPositions = useMemo(() => {
-    return Array.from(nodes.values()).filter(
-      (node) =>
-        !node.position ||
-        typeof node.position.latitude !== "number" ||
-        typeof node.position.longitude !== "number" ||
-        isNaN(node.position.latitude) ||
-        isNaN(node.position.longitude) ||
-        node.position.latitude === 0 ||
-        node.position.longitude === 0
-    );
+    return Array.from(nodes.values()).filter((node) => !hasValidPosition(node));
   }, [nodes]);
 
-  // Compute average center coordinates of nodes with positions
+  // Compute map center: prioritize user's own GPS, then average of others, then default
   const mapCenter = useMemo((): [number, number] => {
+    // 1. Use user's own device GPS if available
+    if (hasValidPosition(myNode)) {
+      return [myNode!.position!.latitude, myNode!.position!.longitude];
+    }
+
+    // 2. Fall back to average of all positioned nodes
     if (nodesWithPositions.length === 0) return DEFAULT_CENTER;
     let totalLat = 0;
     let totalLng = 0;
@@ -77,7 +95,12 @@ export function Map() {
     nodesWithPositions.forEach((n) => {
       const lat = n.position!.latitude;
       const lng = n.position!.longitude;
-      if (typeof lat === "number" && typeof lng === "number" && !isNaN(lat) && !isNaN(lng)) {
+      if (
+        typeof lat === "number" &&
+        typeof lng === "number" &&
+        !isNaN(lat) &&
+        !isNaN(lng)
+      ) {
         totalLat += lat;
         totalLng += lng;
         validCount++;
@@ -88,27 +111,27 @@ export function Map() {
     const avgLng = totalLng / validCount;
     return [
       isNaN(avgLat) ? DEFAULT_CENTER[0] : avgLat,
-      isNaN(avgLng) ? DEFAULT_CENTER[1] : avgLng
+      isNaN(avgLng) ? DEFAULT_CENTER[1] : avgLng,
     ];
-  }, [nodesWithPositions]);
+  }, [myNode, nodesWithPositions]);
 
   // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
     const map = L.map(mapContainerRef.current, {
-      zoomControl: false, // Position zoom control at the bottom right later
+      zoomControl: false,
     }).setView(mapCenter, DEFAULT_ZOOM);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
     mapRef.current = map;
 
-    // Force Leaflet to recalculate the container bounds once layout renders
     const timer = setTimeout(() => {
       map.invalidateSize();
     }, 250);
@@ -120,17 +143,22 @@ export function Map() {
         mapRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected]);
 
-  // Update map view when average center changes (only if map view hasn't been moved by user)
+  // Update map view when average center changes
   const hasMovedRef = useRef(false);
   useEffect(() => {
-    if (mapRef.current && !hasMovedRef.current && nodesWithPositions.length > 0) {
+    if (
+      mapRef.current &&
+      !hasMovedRef.current &&
+      nodesWithPositions.length > 0
+    ) {
       mapRef.current.setView(mapCenter, mapRef.current.getZoom());
     }
   }, [mapCenter, nodesWithPositions.length]);
 
-  // Listen to dragend/zoomend to mark that user has custom positioned the map
+  // Listen to dragstart to mark user interaction
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -143,7 +171,7 @@ export function Map() {
     return () => {
       map.off("dragstart", handleUserInteraction);
     };
-  }, [mapRef.current]);
+  }, []);
 
   // Update markers dynamically when nodes update
   useEffect(() => {
@@ -185,13 +213,11 @@ export function Map() {
       const customIcon = createCustomMarkerIcon(isMe, node.shortName);
 
       if (markersRef.current[node.nodeNum]) {
-        // Update existing marker position, popup, and icon
         const marker = markersRef.current[node.nodeNum];
         marker.setLatLng([latitude, longitude]);
         marker.setPopupContent(markerContent);
         marker.setIcon(customIcon);
       } else {
-        // Create new marker with custom icon
         const marker = L.marker([latitude, longitude], { icon: customIcon })
           .addTo(map)
           .bindPopup(markerContent);
@@ -204,7 +230,7 @@ export function Map() {
       }
     });
 
-    // Remove stale markers (nodes that no longer exist or lost position data)
+    // Remove stale markers
     Object.keys(markersRef.current).forEach((key) => {
       const nodeNum = Number(key);
       if (!activeNodeNums.has(nodeNum)) {
@@ -212,50 +238,36 @@ export function Map() {
         delete markersRef.current[nodeNum];
       }
     });
-  }, [nodesWithPositions]);
-
-  // Center on a specific node from the sidebar list
-  const handleLocateNode = (node: MeshNode) => {
-    if (!mapRef.current || !node.position) return;
-    hasMovedRef.current = true;
-    setSelectedNodeNum(node.nodeNum);
-    mapRef.current.setView(
-      [node.position.latitude, node.position.longitude],
-      15
-    );
-    const marker = markersRef.current[node.nodeNum];
-    if (marker) {
-      marker.openPopup();
-    }
-    // Close sidebar on mobile after choosing a node
-    setMobileSidebarOpen(false);
-  };
+  }, [nodesWithPositions, myNodeNum]);
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   if (!isConnected) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-gray-950 p-6 text-center select-none">
-        <div className="w-full max-w-sm bg-gray-900 border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col items-center">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-600/10 border border-red-600/20 flex items-center justify-center text-red-500 mb-5">
-            <svg className="w-7 h-7 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+      <div className="h-full flex flex-col items-center justify-center bg-surface-0 p-6 text-center select-none">
+        <div className="w-full max-w-sm bg-surface-1 border border-default rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col items-center">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-emergency/10 border border-emergency/20 flex items-center justify-center text-emergency mb-5">
+            <RadioOff className="w-7 h-7 sm:w-8 sm:h-8" aria-hidden="true" />
           </div>
-          <h2 className="text-lg sm:text-xl font-bold text-white mb-2">
+          <h2 className="text-lg sm:text-xl font-bold text-primary mb-2">
             Device Disconnected
           </h2>
-          <p className="text-xs sm:text-sm text-white/60 mb-6 max-w-xs leading-relaxed">
+          <p className="text-xs sm:text-sm text-secondary mb-6 max-w-xs leading-relaxed">
             You must connect to a Meshtastic device to visualize mesh nodes and GPS coordinates on the map.
           </p>
           <button
             onClick={connect}
             disabled={phase === "scanning" || phase === "connecting"}
-            className="w-full py-2.5 sm:py-3 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-lg shadow-green-600/20 cursor-pointer"
+            className="w-full touch-target py-2.5 sm:py-3 bg-mesh hover:bg-mesh/90 disabled:opacity-50 text-surface-0 text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-lg shadow-mesh/20 inline-flex items-center justify-center gap-2"
           >
-            {phase === "scanning" || phase === "connecting"
-              ? "Connecting..."
-              : "Connect Device"}
+            {phase === "scanning" || phase === "connecting" ? (
+              <>
+                <Loader className="w-4 h-4 animate-spin" aria-hidden="true" />
+                Connecting...
+              </>
+            ) : (
+              "Connect Device"
+            )}
           </button>
         </div>
       </div>
@@ -263,93 +275,106 @@ export function Map() {
   }
 
   return (
-    <div className="h-full flex relative bg-gray-950 overflow-hidden select-none">
+    <div className="h-full flex relative bg-surface-0 overflow-hidden select-none">
       {/* Sidebar - Node List (Responsive Sidebar / Mobile Drawer) */}
       <aside
         className={`
-          absolute lg:relative inset-y-0 left-0 z-20
-          w-72 sm:w-80 bg-gray-900 border-r border-white/10 flex flex-col flex-shrink-0 h-full
+          absolute md:relative inset-y-0 left-0 z-20
+          w-72 sm:w-80 bg-surface-1 border-r border-default flex flex-col flex-shrink-0 h-full
           transition-transform duration-300 ease-in-out
-          ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+          ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         `}
       >
-        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-gray-900/60 backdrop-blur">
+        <div className="p-4 border-b border-subtle flex items-center justify-between bg-surface-1/60 backdrop-blur">
           <div>
-            <h2 className="text-md font-bold tracking-tight text-white flex items-center gap-2">
+            <h2 className="text-md font-bold tracking-tight text-primary flex items-center gap-2">
               Node Directory
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/10 text-white/70 font-mono font-medium">
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-surface-3 text-secondary font-mono font-medium border border-subtle">
                 {nodes.size}
               </span>
             </h2>
-            <p className="text-[10px] text-white/40 mt-0.5">
+            <p className="text-[10px] text-tertiary mt-0.5">
               Available network devices
             </p>
           </div>
-          {/* Close button on mobile/tablets */}
+          {/* Close button on mobile */}
           <button
             onClick={() => setMobileSidebarOpen(false)}
-            className="lg:hidden p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="md:hidden touch-target-sm inline-flex items-center justify-center p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-surface-3 transition-colors"
+            aria-label="Close node list"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto divide-y divide-white/5 scrollbar-thin p-2 space-y-2">
+        <div className="flex-1 overflow-y-auto divide-y divide-subtle scrollbar-thin p-2 space-y-2">
           {/* Group 1: Nodes with Location */}
           <div className="space-y-1.5">
             <div className="px-2 py-1 flex items-center gap-1.5 mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-mesh animate-pulse" aria-hidden="true" />
+              <span className="text-[10px] text-mesh font-bold uppercase tracking-wider font-mono">
                 GPS Position Active ({nodesWithPositions.length})
               </span>
             </div>
-            
+
             <div className="space-y-1">
               {nodesWithPositions.length === 0 ? (
-                <div className="px-3 py-4 text-center border border-dashed border-white/5 rounded-xl text-white/30 text-xs">
+                <div className="px-3 py-4 text-center border border-dashed border-subtle rounded-xl text-disabled text-xs">
                   No devices plotting coordinates
                 </div>
               ) : (
                 nodesWithPositions.map((node) => {
                   const isSelected = selectedNodeNum === node.nodeNum;
                   return (
-                    <button
+                      <button
                       key={node.nodeNum}
-                      onClick={() => handleLocateNode(node)}
-                      className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 hover:translate-x-0.5 duration-150 ${
+                      onClick={() => {
+                        // eslint-disable-next-line react-hooks/refs
+                        if (!mapRef.current || !node.position) return;
+                        hasMovedRef.current = true;
+                        setSelectedNodeNum(node.nodeNum);
+                        mapRef.current.setView(
+                          [node.position.latitude, node.position.longitude],
+                          15,
+                        );
+                        const marker = markersRef.current[node.nodeNum];
+                        if (marker) marker.openPopup();
+                        setMobileSidebarOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all flex items-center gap-3 hover:translate-x-0.5 duration-150 ${
                         isSelected
-                          ? "bg-emerald-500/10 border-emerald-500/30 shadow-lg shadow-emerald-500/5"
-                          : "bg-white/2 hover:bg-white/5 border-transparent"
+                          ? "bg-mesh/10 border-mesh/30 shadow-lg shadow-mesh/5"
+                          : "bg-surface-1/30 hover:bg-surface-1/50 border-transparent"
                       }`}
                     >
-                      <div className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center text-emerald-400 font-bold text-xs flex-shrink-0 border border-emerald-500/30">
+                      <div className="w-8 h-8 rounded-full bg-mesh/15 flex items-center justify-center text-mesh-light font-bold text-xs flex-shrink-0 border border-mesh/30">
                         {node.shortName.toUpperCase().slice(0, 2)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-semibold text-white truncate">
+                          <p className="text-sm font-semibold text-primary truncate">
                             {node.longName || node.shortName}
                           </p>
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[9px] font-mono px-1 rounded bg-white/5 text-white/50 border border-white/5">
+                          <span className="text-[9px] font-mono px-1 rounded bg-surface-1 text-tertiary border border-subtle">
                             {node.nodeNum.toString(16).toUpperCase()}
                           </span>
-                          <span className="text-[9px] text-white/40 truncate">
+                          <span className="text-[9px] text-tertiary truncate">
                             {node.role}
                           </span>
                         </div>
                       </div>
                       {node.batteryLevel !== undefined && (
-                        <span className={`text-[10px] font-mono font-medium px-1.5 py-0.5 rounded flex-shrink-0 border ${
-                          node.batteryLevel > 50
-                            ? "bg-green-500/10 text-green-400 border-green-500/20"
-                            : node.batteryLevel > 20
-                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                            : "bg-red-500/10 text-red-400 border-red-500/20"
-                        }`}>
+                        <span
+                          className={`text-[10px] font-mono font-medium px-1.5 py-0.5 rounded flex-shrink-0 border ${
+                            node.batteryLevel > 50
+                              ? "bg-mesh/10 text-mesh-light border-mesh/20"
+                              : node.batteryLevel > 20
+                              ? "bg-warn/10 text-warn-light border-warn/20"
+                              : "bg-emergency/10 text-emergency-light border-emergency/20"
+                          }`}
+                        >
                           {node.batteryLevel}%
                         </span>
                       )}
@@ -363,47 +388,49 @@ export function Map() {
           {/* Group 2: Nodes without Location */}
           <div className="space-y-1.5 pt-2">
             <div className="px-2 py-1 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-              <span className="text-[10px] text-rose-400 font-bold uppercase tracking-wider font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-emergency" aria-hidden="true" />
+              <span className="text-[10px] text-emergency font-bold uppercase tracking-wider font-mono">
                 GPS Lock Pending ({nodesWithoutPositions.length})
               </span>
             </div>
 
             <div className="space-y-1">
               {nodesWithoutPositions.length === 0 ? (
-                <div className="px-3 py-4 text-center border border-dashed border-white/5 rounded-xl text-white/30 text-xs">
+                <div className="px-3 py-4 text-center border border-dashed border-subtle rounded-xl text-disabled text-xs">
                   All active devices are mapped
                 </div>
               ) : (
                 nodesWithoutPositions.map((node) => (
                   <div
                     key={node.nodeNum}
-                    className="w-full text-left px-3 py-2.5 rounded-xl border border-transparent bg-white/2 hover:bg-white/4 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-3 py-2.5 rounded-xl border border-transparent bg-surface-1/30 hover:bg-surface-1/40 flex items-center gap-3 transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-full bg-rose-500/15 flex items-center justify-center text-rose-400 font-bold text-xs flex-shrink-0 border border-rose-500/20">
+                    <div className="w-8 h-8 rounded-full bg-emergency/15 flex items-center justify-center text-emergency-light font-bold text-xs flex-shrink-0 border border-emergency/20">
                       {node.shortName.toUpperCase().slice(0, 2)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white/90 truncate">
+                      <p className="text-sm font-semibold text-primary truncate">
                         {node.longName || node.shortName}
                       </p>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[9px] font-mono px-1 rounded bg-white/5 text-white/40 border border-white/5">
+                        <span className="text-[9px] font-mono px-1 rounded bg-surface-1 text-tertiary border border-subtle">
                           {node.nodeNum.toString(16).toUpperCase()}
                         </span>
-                        <span className="text-[9px] text-rose-400/80 font-medium">
+                        <span className="text-[9px] text-emergency font-medium">
                           No Location
                         </span>
                       </div>
                     </div>
                     {node.batteryLevel !== undefined && (
-                      <span className={`text-[10px] font-mono font-medium px-1.5 py-0.5 rounded flex-shrink-0 border ${
-                        node.batteryLevel > 50
-                          ? "bg-green-500/10 text-green-400 border-green-500/20"
-                          : node.batteryLevel > 20
-                          ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                          : "bg-red-500/10 text-red-400 border-red-500/20"
-                      }`}>
+                      <span
+                        className={`text-[10px] font-mono font-medium px-1.5 py-0.5 rounded flex-shrink-0 border ${
+                          node.batteryLevel > 50
+                            ? "bg-mesh/10 text-mesh-light border-mesh/20"
+                            : node.batteryLevel > 20
+                            ? "bg-warn/10 text-warn-light border-warn/20"
+                            : "bg-emergency/10 text-emergency-light border-emergency/20"
+                        }`}
+                      >
                         {node.batteryLevel}%
                       </span>
                     )}
@@ -419,21 +446,20 @@ export function Map() {
       {mobileSidebarOpen && (
         <div
           onClick={() => setMobileSidebarOpen(false)}
-          className="lg:hidden fixed inset-0 z-10 bg-black/60 backdrop-blur-xs transition-opacity"
+          className="md:hidden fixed inset-0 z-10 bg-black/60 backdrop-blur-sm transition-opacity"
+          aria-hidden="true"
         />
       )}
 
       {/* Map Canvas */}
       <div className="flex-1 h-full min-h-[300px] relative z-0">
-        {/* Floating Menu Toggle Button (Visible on Mobile/Tablets only) */}
+        {/* Floating Menu Toggle Button (Visible on Mobile only) */}
         <button
           onClick={() => setMobileSidebarOpen(true)}
-          className="lg:hidden absolute top-4 left-4 z-[999] flex items-center justify-center w-10 h-10 bg-gray-900/90 border border-white/10 text-white hover:bg-gray-800 rounded-full shadow-lg transition-all cursor-pointer"
+          className="md:hidden absolute top-4 left-4 z-[999] flex items-center justify-center touch-target bg-surface-1/90 border border-default text-primary hover:bg-surface-2 rounded-full shadow-lg transition-all"
           aria-label="Open Node List"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
+          <Menu className="w-5 h-5" aria-hidden="true" />
         </button>
 
         <div ref={mapContainerRef} className="w-full h-full" id="map-container" />

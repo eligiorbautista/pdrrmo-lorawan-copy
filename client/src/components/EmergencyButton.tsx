@@ -1,4 +1,10 @@
 import { useState } from "react";
+import {
+  CheckCircle,
+  AlertTriangle,
+  Loader,
+  Siren,
+} from "lucide-react";
 import { useEmergency } from "@/hooks/useEmergency";
 
 export function EmergencyButton() {
@@ -34,17 +40,19 @@ export function EmergencyButton() {
 
   if (sending) {
     return (
-      <div className="w-full p-6 rounded-2xl bg-red-900/60 border-2 border-red-600 animate-pulse text-center">
-        <div className="text-4xl mb-3">🚨</div>
-        <p className="text-red-200 text-lg font-bold mb-2">
-          Sending Emergency Alert…
+      <div className="w-full p-6 md:p-8 rounded-2xl bg-emergency/10 border-2 border-emergency/30 animate-pulse text-center">
+        <div className="w-14 h-14 mx-auto rounded-full bg-emergency/10 border border-emergency/20 flex items-center justify-center text-emergency mb-4">
+          <Loader className="w-7 h-7 animate-spin" aria-hidden="true" />
+        </div>
+        <p className="text-emergency-light text-lg font-bold mb-2">
+          Sending Emergency Alert
         </p>
-        <p className="text-red-300/70 text-sm mb-4">
+        <p className="text-emergency/70 text-sm mb-5">
           Do not close this screen. Retrying if needed.
         </p>
         <button
           onClick={handleCancelSend}
-          className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition-colors border border-white/20"
+          className="touch-target-sm px-6 py-2.5 bg-surface-2 hover:bg-surface-3 text-primary text-sm rounded-lg transition-colors border border-default"
         >
           Cancel Send
         </button>
@@ -54,12 +62,14 @@ export function EmergencyButton() {
 
   if (lastAlert?.status === "acked") {
     return (
-      <div className="w-full p-6 rounded-2xl bg-green-900/40 border-2 border-green-600 text-center">
-        <div className="text-4xl mb-2">✅</div>
-        <p className="text-green-200 text-lg font-bold mb-1">
+      <div className="w-full p-6 md:p-8 rounded-2xl bg-mesh/5 border-2 border-mesh/30 text-center">
+        <div className="w-14 h-14 mx-auto rounded-full bg-mesh/10 border border-mesh/20 flex items-center justify-center text-mesh mb-3">
+          <CheckCircle className="w-7 h-7" aria-hidden="true" />
+        </div>
+        <p className="text-mesh-light text-lg font-bold mb-1">
           Alert Acknowledged
         </p>
-        <p className="text-green-300/70 text-sm">
+        <p className="text-mesh/70 text-sm">
           Command center has been notified.
           {lastAlert.ackedAt &&
             ` ${lastAlert.ackedAt.toLocaleTimeString()}`}
@@ -70,20 +80,22 @@ export function EmergencyButton() {
 
   if (lastAlert?.status === "failed") {
     return (
-      <div className="w-full p-6 rounded-2xl bg-yellow-900/40 border-2 border-yellow-600 text-center">
-        <div className="text-4xl mb-2">⚠️</div>
-        <p className="text-yellow-200 text-lg font-bold mb-1">
+      <div className="w-full p-6 md:p-8 rounded-2xl bg-warn/5 border-2 border-warn/30 text-center">
+        <div className="w-14 h-14 mx-auto rounded-full bg-warn/10 border border-warn/20 flex items-center justify-center text-warn mb-3">
+          <AlertTriangle className="w-7 h-7" aria-hidden="true" />
+        </div>
+        <p className="text-warn-light text-lg font-bold mb-1">
           Alert Delivery Failed
         </p>
-        <p className="text-yellow-300/70 text-sm mb-1">
+        <p className="text-warn/70 text-sm mb-1">
           {error ?? "Could not reach any node. Try moving to higher ground."}
         </p>
-        <p className="text-yellow-300/50 text-xs mb-4">
+        <p className="text-warn/50 text-xs mb-5">
           Retried {lastAlert.retryCount} time{lastAlert.retryCount !== 1 ? "s" : ""}
         </p>
         <button
           onClick={() => sendEmergency(message || undefined)}
-          className="px-6 py-2 bg-yellow-600/30 hover:bg-yellow-600/50 text-white text-sm rounded-lg transition-colors border border-yellow-600/50"
+          className="touch-target-sm px-6 py-2.5 bg-warn/10 hover:bg-warn/20 text-warn text-sm rounded-lg transition-colors border border-warn/30"
         >
           Try Again
         </button>
@@ -93,12 +105,14 @@ export function EmergencyButton() {
 
   if (confirmed) {
     return (
-      <div className="w-full p-6 rounded-2xl bg-red-900/80 border-2 border-red-500 text-center">
-        <div className="text-4xl mb-3 animate-bounce">🚨</div>
-        <p className="text-red-100 text-lg font-bold mb-4">
+      <div className="w-full p-6 md:p-8 rounded-2xl bg-emergency/10 border-2 border-emergency/30 text-center">
+        <div className="w-14 h-14 mx-auto rounded-full bg-emergency/10 border border-emergency/20 flex items-center justify-center text-emergency mb-3 animate-bounce">
+          <Siren className="w-7 h-7" aria-hidden="true" />
+        </div>
+        <p className="text-emergency-light text-lg font-bold mb-4">
           Confirm Emergency Alert
         </p>
-        <p className="text-red-200/70 text-sm mb-4">
+        <p className="text-emergency/70 text-sm mb-5 max-w-md mx-auto">
           This will broadcast an emergency alert to ALL nodes on the mesh.
           Command center will be notified.
         </p>
@@ -108,20 +122,21 @@ export function EmergencyButton() {
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Describe the emergency (optional)…"
           rows={3}
-          className="w-full bg-red-950/50 text-white text-sm rounded-lg px-3 py-2 border border-red-700/50 resize-none focus:outline-none focus:border-red-400 placeholder-red-300/30 mb-4"
+          className="w-full bg-emergency/5 text-primary text-sm rounded-lg px-3 py-2.5 border border-emergency/20 resize-none focus:outline-none focus:border-emergency/50 placeholder:text-emergency/30 mb-5 transition-all"
         />
 
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
             onClick={handleConfirmSend}
             disabled={!isReady}
-            className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-base font-bold rounded-lg transition-colors"
+            className="touch-target inline-flex items-center justify-center gap-2 px-6 py-3 bg-emergency hover:bg-emergency/90 disabled:opacity-40 disabled:cursor-not-allowed text-white text-base font-bold rounded-lg transition-colors shadow-glow-emergency"
           >
+            <Siren className="w-5 h-5" aria-hidden="true" />
             SEND EMERGENCY ALERT
           </button>
           <button
             onClick={handleCancel}
-            className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition-colors border border-white/20"
+            className="touch-target inline-flex items-center justify-center px-6 py-3 bg-surface-2 hover:bg-surface-3 text-primary text-sm rounded-lg transition-colors border border-default"
           >
             Cancel
           </button>
@@ -135,19 +150,21 @@ export function EmergencyButton() {
     <button
       onClick={handleInitialPress}
       disabled={!isReady}
-      className="w-full p-6 rounded-2xl bg-red-600 hover:bg-red-500 active:bg-red-700
+      className="w-full touch-target p-5 md:p-6 rounded-2xl bg-emergency hover:bg-emergency/90 active:bg-emergency/80
         disabled:opacity-40 disabled:cursor-not-allowed
-        text-white text-xl font-extrabold tracking-wide
-        shadow-lg shadow-red-900/30 hover:shadow-red-800/40
+        text-white text-xl-fluid font-extrabold tracking-wide
+        shadow-lg shadow-emergency/20 hover:shadow-emergency/30
         transform hover:scale-[1.02] active:scale-[0.98]
         transition-all duration-150
-        border-2 border-red-400/50 hover:border-red-300/50"
+        border-2 border-emergency-light/30 hover:border-emergency-light/50
+        inline-flex flex-col items-center justify-center gap-2"
+      aria-label="Send emergency alert"
     >
-      <div className="text-4xl mb-2">🚨</div>
-      EMERGENCY
-      <div className="text-xs font-normal mt-1 opacity-80">
+      <Siren className="w-10 h-10 md:w-12 md:h-12" aria-hidden="true" />
+      <span>EMERGENCY</span>
+      <span className="text-xs md:text-sm font-normal opacity-80">
         Press to send alert
-      </div>
+      </span>
     </button>
   );
 }

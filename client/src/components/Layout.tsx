@@ -1,111 +1,312 @@
-import { useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { NavLink, useLocation, Outlet } from "react-router-dom";
+import {
+  Menu,
+  X,
+  Home,
+  Map,
+  LayoutDashboard,
+  Bell,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { LogoIcon } from "@/components/LogoIcon";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { useMessageStore } from "@/store/messageStore";
 
+/* ================================================================
+   NAVIGATION ARCHITECTURE
+   ----------------------------------------------------------------
+   Features are strictly separated into four dedicated views:
+
+   1. PRIMARY WORKSPACE — Core active operations & real-time status
+      - Field Ops      (/)
+      - Node Map       (/map)
+
+   2. MANAGEMENT PORTAL — Lists, records, data tables, configs
+      - Command Dashboard  (/dashboard)
+      - Alert Dispatch     (/dispatch)
+
+   3. USER / PROFILE SETTINGS — Account, auth, security, prefs
+      - Settings       (/settings)
+
+   4. SYSTEM / ADMIN LOGS — Audit trails, history, system states
+      - System Logs    (/system)
+   ================================================================ */
+
+interface NavItem {
+  to: string;
+  label: string;
+  icon: React.ElementType;
+  badge?: number;
+}
+
+interface NavGroup {
+  title: string;
+  items: NavItem[];
+}
+
+const navGroups: NavGroup[] = [
+  {
+    title: "Primary Workspace",
+    items: [
+      { to: "/", label: "Field Ops", icon: Home },
+      { to: "/map", label: "Node Map", icon: Map },
+    ],
+  },
+  {
+    title: "Management Portal",
+    items: [
+      { to: "/dashboard", label: "Command Dashboard", icon: LayoutDashboard },
+      { to: "/dispatch", label: "Alert Dispatch", icon: Bell },
+    ],
+  },
+];
+
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<number, boolean>>({});
+  const location = useLocation();
+
   const activeAlerts = useMessageStore(
     (s) => s.alerts.filter((a) => a.status !== "resolved").length,
   );
 
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-      isActive
-        ? "bg-white/15 text-white"
-        : "text-white/70 hover:bg-white/10 hover:text-white"
-    }`;
+  /* Lock body scroll when mobile sidebar is open */
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [sidebarOpen]);
+
+  /* Collapse Management Portal by default on very small screens */
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 319px)");
+    const handle = (e: MediaQueryListEvent | MediaQueryList) => {
+      if (e.matches) {
+        setCollapsedGroups({ 1: true });
+      }
+    };
+    handle(mq);
+    mq.addEventListener("change", handle);
+    return () => mq.removeEventListener("change", handle);
+  }, []);
+
+  const toggleGroup = useCallback((index: number) => {
+    setCollapsedGroups((prev) => ({ ...prev, [index]: !prev[index] }));
+  }, []);
+
+  const handleOverlayClick = useCallback(() => {
+    setSidebarOpen(false);
+  }, []);
+
+  const handleMenuKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        setSidebarOpen((prev) => !prev);
+      }
+    },
+    [],
+  );
 
   return (
-    <div className="h-dvh flex flex-col bg-gray-950 text-white">
-      {/* Top bar */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-gray-900/50 backdrop-blur">
-        <div className="flex items-center gap-3">
+    <div className="h-dvh flex flex-col bg-surface-0 text-primary overflow-hidden">
+      {/* ============================================================
+          TOP BAR — Global header visible on all breakpoints.
+          On micro-mobile we compress padding and hide non-essential text.
+          ============================================================ */}
+      <header className="flex-shrink-0 flex items-center justify-between gap-3 px-3 py-2.5 xs:px-4 xs:py-3 md:px-5 md:py-3.5 border-b border-default bg-surface-1/80 backdrop-glass z-30">
+        <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
+          {/* Mobile menu toggle — strictly 48x48 touch target */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden p-1 text-white/80 hover:text-white cursor-pointer"
-            aria-label="Toggle menu"
+            onKeyDown={handleMenuKeyDown}
+            className="md:hidden touch-target inline-flex items-center justify-center rounded-lg text-secondary hover:text-primary hover:bg-surface-3 transition-colors"
+            aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={sidebarOpen}
+            aria-controls="primary-sidebar"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            {sidebarOpen ? (
+              <X className="w-6 h-6" aria-hidden="true" />
+            ) : (
+              <Menu className="w-6 h-6" aria-hidden="true" />
+            )}
           </button>
-          <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="PDRRMO Logo" className="w-8 h-8 object-contain" />
-            <h1 className="text-lg font-bold tracking-tight">
-              <span className="text-mesh-green">PDRRMO</span> Mesh
-            </h1>
+
+          {/* Brand */}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="hidden xs:inline-flex items-center justify-center w-10 h-10 rounded-full bg-mesh/10 border border-mesh/20 text-mesh flex-shrink-0 overflow-hidden">
+              <LogoIcon aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-base-fluid font-bold tracking-tight truncate">
+                <span className="text-mesh">PDRRMO</span>{" "}
+                <span className="text-primary hidden sm:inline">Mesh</span>
+              </h1>
+            </div>
           </div>
         </div>
 
-        <ConnectionStatus />
+        {/* Connection Status — simplified on micro-mobile via CSS */}
+        <div className="flex-shrink-0">
+          <ConnectionStatus />
+        </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
+      {/* ============================================================
+          MAIN SHELL — Sidebar + Content
+          ============================================================ */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* --------------------------------------------------------
+            SIDEBAR — Responsive behavior:
+            - < md (768px): Fixed overlay, slides in/out
+            - >= md: Static relative sidebar
+            - >= lg (1200px): Slightly wider, larger typography
+            -------------------------------------------------------- */}
         <aside
+          id="primary-sidebar"
           className={`
-            lg:relative fixed inset-y-0 left-0 z-40 
-            w-64 bg-gray-900 border-r border-white/10 pt-16 lg:pt-0
-            transform transition-transform lg:transform-none
-            ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+            fixed md:relative inset-y-0 left-0 z-40
+            w-[16.5rem] xs:w-[17rem] md:w-[15rem] lg:w-[16.5rem] xl:w-[18rem]
+            bg-surface-1 border-r border-default
+            transform transition-transform duration-200 ease-out
+            flex flex-col
+            ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
           `}
+          aria-label="Main navigation"
         >
-          <nav className="p-3 space-y-1">
-            <NavLink to="/" end className={linkClass}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              Field Ops
-            </NavLink>
+          {/* Sidebar header (mobile only) */}
+          <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-subtle">
+            <span className="text-sm font-semibold text-secondary">Menu</span>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="touch-target-sm inline-flex items-center justify-center rounded-lg text-secondary hover:text-primary hover:bg-surface-3 transition-colors"
+              aria-label="Close menu"
+            >
+              <X className="w-5 h-5" aria-hidden="true" />
+            </button>
+          </div>
 
-            <NavLink to="/map" className={linkClass}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-              </svg>
-              Node Map
-            </NavLink>
+          {/* Scrollable nav area */}
+          <nav className="flex-1 overflow-y-auto p-3 md:p-2.5 lg:p-3 space-y-5 md:space-y-4">
+            {navGroups.map((group, groupIndex) => {
+              const isCollapsed = collapsedGroups[groupIndex] ?? false;
+              return (
+                <div key={group.title}>
+                  {/* Group header — collapsible on mobile */}
+                  <button
+                    onClick={() => toggleGroup(groupIndex)}
+                    className="w-full flex items-center justify-between gap-2 mb-1.5 px-2.5 py-1.5 rounded-md text-xs-fluid font-semibold text-tertiary uppercase tracking-wider hover:bg-surface-3 transition-colors md:pointer-events-none md:cursor-default"
+                    aria-expanded={!isCollapsed}
+                    aria-controls={`nav-group-${groupIndex}`}
+                  >
+                    <span className="truncate">{group.title}</span>
+                    <span className="md:hidden flex-shrink-0">
+                      {isCollapsed ? (
+                        <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+                      ) : (
+                        <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" />
+                      )}
+                    </span>
+                  </button>
 
-            <NavLink to="/dashboard" className={linkClass}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              Dashboard
-            </NavLink>
+                  <div
+                    id={`nav-group-${groupIndex}`}
+                    className={`space-y-0.5 ${isCollapsed ? "hidden md:block" : ""}`}
+                  >
+                    {group.items.map((item) => {
+                      const isDispatch = item.to === "/dispatch";
+                      const badgeCount = isDispatch ? activeAlerts : undefined;
+                      const ItemIcon = item.icon;
 
-            <NavLink to="/dispatch" className={linkClass}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              Dispatch
-              {activeAlerts > 0 && (
-                <span className="ml-auto bg-emergency text-white text-xs rounded-full px-1.5 py-0.5 animate-pulse">
-                  {activeAlerts}
-                </span>
-              )}
-              {activeAlerts === 0 && (
-                <span className="ml-auto bg-white/10 text-white/40 text-xs rounded-full px-1.5 py-0.5">
-                  0
-                </span>
-              )}
-            </NavLink>
+                      return (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          end={item.to === "/"}
+                          onClick={() => setSidebarOpen(false)}
+                          className={({ isActive }) =>
+                            `group flex items-center gap-2.5 md:gap-2 px-2.5 py-2 md:px-2.5 md:py-1.5 lg:px-3 lg:py-2 rounded-lg text-sm-fluid font-medium transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-info/60 ${
+                              isActive
+                                ? "bg-surface-3 text-primary border border-default shadow-sm"
+                                : "text-secondary hover:bg-surface-3/60 hover:text-primary border border-transparent"
+                            }`
+                          }
+                        >
+                          <ItemIcon
+                            className={`w-[1.125rem] h-[1.125rem] flex-shrink-0 transition-colors ${
+                              location.pathname === item.to ||
+                              (item.to !== "/" && location.pathname.startsWith(item.to))
+                                ? "text-mesh"
+                                : "text-tertiary group-hover:text-secondary"
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{item.label}</span>
+
+                          {badgeCount !== undefined && (
+                            <span
+                              className={`ml-auto flex-shrink-0 text-[0.625rem] font-bold rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center ${
+                                badgeCount > 0
+                                  ? "bg-emergency/15 text-emergency border border-emergency/20 animate-pulse-slow"
+                                  : "bg-surface-3 text-tertiary border border-subtle"
+                              }`}
+                              aria-label={`${badgeCount} active alerts`}
+                            >
+                              {badgeCount}
+                            </span>
+                          )}
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </nav>
+
+          {/* Sidebar footer */}
+          <div className="hidden md:block p-3 lg:p-4 border-t border-subtle">
+            <div className="rounded-lg bg-surface-2 border border-subtle px-3 py-2">
+              <p className="text-[0.625rem] text-tertiary uppercase tracking-wider font-semibold mb-1">
+                System
+              </p>
+              <div className="flex items-center gap-2 text-xs-fluid text-secondary">
+                <span className="w-1.5 h-1.5 rounded-full bg-mesh animate-pulse" aria-hidden="true" />
+                Mesh Online
+              </div>
+            </div>
+          </div>
         </aside>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto">
+        {/* --------------------------------------------------------
+            MOBILE OVERLAY — Dims content when sidebar is open.
+            Only rendered < md to keep DOM light on desktop.
+            -------------------------------------------------------- */}
+        {sidebarOpen && (
+          <div
+            className="md:hidden fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px] animate-fade-in"
+            onClick={handleOverlayClick}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* --------------------------------------------------------
+            MAIN CONTENT AREA
+            - overflow-y-auto for independent scrolling
+            - container-content caps width on 4K displays
+            -------------------------------------------------------- */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-surface-0 relative">
           <Outlet />
         </main>
       </div>
-
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          className="lg:hidden fixed inset-0 z-30 bg-black/50 cursor-pointer"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
 
       <InstallPrompt />
     </div>
