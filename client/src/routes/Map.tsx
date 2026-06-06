@@ -368,7 +368,7 @@ export function Map() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto divide-y divide-subtle scrollbar-thin p-2 space-y-2">
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-2 space-y-2">
           {/* Group 1: Nodes with Location */}
           <div className="space-y-1.5">
             <div className="px-2 py-1 flex items-center gap-1.5 mt-1">
@@ -435,7 +435,7 @@ export function Map() {
           </div>
 
           {/* Group 2: Nodes without Location */}
-          <div className="space-y-1.5 pt-2">
+          <div className="space-y-1.5 border-t border-subtle pt-4">
             <div className="px-2 py-1 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emergency" aria-hidden="true" />
               <span className="text-[10px] text-emergency font-bold uppercase tracking-wider font-mono">
