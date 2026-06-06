@@ -10,6 +10,10 @@ export async function createBluetoothDevice(): Promise<{
   transport: TransportWebBluetooth;
 }> {
   const transport = await TransportWebBluetooth.create();
+
+  // Allow the newly established bonding secure tunnel to settle
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
   const device = new MeshDevice(transport);
   return { device, transport };
 }

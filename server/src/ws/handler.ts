@@ -2,12 +2,12 @@ import type { ServerWebSocket } from "bun";
 import type { WsMessage } from "@/lib/types";
 
 /** Set of connected WebSocket clients */
-const clients = new Set<ServerWebSocket<unknown>>();
+export const clients = new Set<ServerWebSocket<unknown>>();
 
 /**
  * Handle incoming WebSocket connection.
  */
-export function handleConnection(ws: ServerWebSocket<unknown>): void {
+export function handleOpen(ws: ServerWebSocket<unknown>): void {
   clients.add(ws);
 
   ws.send(
@@ -16,16 +16,13 @@ export function handleConnection(ws: ServerWebSocket<unknown>): void {
       payload: { clientId: crypto.randomUUID().slice(0, 8) },
     }),
   );
+}
 
-  ws.addEventListener("close", () => {
-    clients.delete(ws);
-  });
-
-  ws.addEventListener("message", (event) => {
-    // Handle client-to-server messages if needed
-    // For MVP, clients only receive broadcasts
-    void event;
-  });
+/**
+ * Handle closed WebSocket connection.
+ */
+export function handleClose(ws: ServerWebSocket<unknown>): void {
+  clients.delete(ws);
 }
 
 /**

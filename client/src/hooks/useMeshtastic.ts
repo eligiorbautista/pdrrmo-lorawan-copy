@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { Protobuf, Types } from "@meshtastic/core";
 import { useDeviceStore } from "@/store/deviceStore";
-import { createBluetoothDevice, reconnectToDevice } from "@/lib/meshtastic";
+import { createBluetoothDevice } from "@/lib/meshtastic";
 import type { MeshNode } from "@/lib/types";
 
 /**
@@ -27,6 +27,14 @@ export function useMeshtastic() {
       (info: Protobuf.Mesh.MyNodeInfo) => {
         store.setMyNodeNum(info.myNodeNum);
         store.setPhase("configured");
+        // Add ourselves (the local node) to the store's nodes list
+        store.upsertNode({
+          nodeNum: info.myNodeNum,
+          shortName: "Me",
+          longName: "Local Node Gateway",
+          lastHeard: new Date(),
+          role: "Local Client",
+        });
       },
     );
 
@@ -93,9 +101,7 @@ export function useMeshtastic() {
       store.setPhase("scanning");
       store.setError(null);
 
-      const { device, transport } = store.bluetoothDevice
-        ? await reconnectToDevice(store.bluetoothDevice)
-        : await createBluetoothDevice();
+      const { device, transport } = await createBluetoothDevice();
 
       // Store Bluetooth device reference for reconnection
       const btDevice = (
@@ -112,19 +118,73 @@ export function useMeshtastic() {
       disconnectRef.current = async () => {
         clearInterval(heartbeatRef.current);
         try {
-          device.disconnect();
+          await device.disconnect();
         } catch {
           // Disconnect may throw if already disconnected
         }
-        await transport.disconnect();
+        try {
+          await transport.disconnect();
+        } catch {
+          // Ignore errors if transport is already dead
+        }
         store.setConnection(null);
         store.setPhase("disconnected");
       };
 
-      // Start the Meshtastic protocol handshake.
+      // Wait for the device to successfully complete its pairing/bonding and report Connected
+      store.setPhase("connecting");
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          unsub();
+          reject(new Error("Pairing attempt timed out. Please try again."));
+        }, 45000); // 45 seconds timeout to allow slow typing of PIN
+
+        const unsub = device.events.onDeviceStatus.subscribe((status: Types.DeviceStatusEnum) => {
+          if (status === Types.DeviceStatusEnum.DeviceConnected) {
+            clearTimeout(timeout);
+            unsub();
+            resolve();
+          } else if (status === Types.DeviceStatusEnum.DeviceDisconnected) {
+            clearTimeout(timeout);
+            unsub();
+            reject(new Error("Device disconnected during pairing."));
+          }
+        });
+      });
+
+      store.setPhase("configuring");
+
       // configure() requests config + node info from the device.
       // When the device responds, onMyNodeInfo fires → phase transitions to "configured".
       await device.configure();
+
+      // Request browser location and share it with the local device (especially if it has no built-in GPS)
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            try {
+              // Set the fixed position on the device
+              await device.setFixedPosition(latitude, longitude);
+              // Update local node position in the store
+              store.upsertNode({
+                nodeNum: store.myNodeNum ?? 0,
+                shortName: "Me",
+                longName: "Local Node Gateway",
+                lastHeard: new Date(),
+                position: { latitude, longitude },
+                role: "Local Client",
+              });
+            } catch (e) {
+              console.warn("Failed to set device position:", e);
+            }
+          },
+          (err) => {
+            console.warn("Geolocation denied or failed:", err);
+          },
+          { enableHighAccuracy: true }
+        );
+      }
 
       // Start heartbeat to keep the connection alive
       device.heartbeat().catch(() => {});
@@ -133,8 +193,27 @@ export function useMeshtastic() {
         device.heartbeat().catch(() => {});
       }, 5 * 60 * 1000); // 5-minute heartbeat interval
     } catch (err) {
+      // Clear the stale device reference so the next attempt opens a fresh
+      // browser picker instead of retrying a dead BLE handle.
+      store.setBluetoothDevice(null);
+      store.setConnection(null);
+
+      // Clean up connection handles if they were instantiated before failure
+      if (disconnectRef.current) {
+        await disconnectRef.current().catch(() => {});
+        disconnectRef.current = null;
+      }
+
+      const message = err instanceof Error ? err.message : "Failed to connect";
+      // Surface a friendlier hint when the low-level transport rejects.
+      const isTransportError =
+        message.toLowerCase().includes("connection attempt failed") ||
+        message.toLowerCase().includes("gatt") ||
+        message.toLowerCase().includes("not found");
       store.setError(
-        err instanceof Error ? err.message : "Failed to connect",
+        isTransportError
+          ? `Bluetooth pairing failed: make sure the device is powered on, in range, and not already connected to another app. (${message})`
+          : message,
       );
       store.setPhase("error");
     }

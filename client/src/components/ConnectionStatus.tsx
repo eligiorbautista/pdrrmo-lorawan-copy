@@ -33,7 +33,7 @@ export function ConnectionStatus() {
       <button
         onClick={isConnected ? disconnect : connect}
         disabled={phase === "scanning" || phase === "connecting"}
-        className={`ml-auto px-3 py-1 text-xs font-semibold rounded-md transition-colors
+        className={`ml-auto px-3 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer
           ${isConnected
             ? "bg-red-600/80 hover:bg-red-600 text-white"
             : "bg-green-600/80 hover:bg-green-600 text-white"}

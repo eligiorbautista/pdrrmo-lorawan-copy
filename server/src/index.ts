@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { alertsRoute } from "@/routes/alerts";
 import { messagesRoute } from "@/routes/messages";
 import { nodesRoute } from "@/routes/nodes";
-import { handleConnection } from "@/ws/handler";
+import { handleOpen, handleClose } from "@/ws/handler";
 import { initGateway } from "@/lib/gateway";
 import type { GatewayConfig } from "@/lib/gateway";
 
@@ -31,12 +31,11 @@ app.route("/api/nodes", nodesRoute);
 
 // WebSocket upgrade endpoint
 app.get("/api/ws", (c) => {
-  const url = new URL(c.req.url);
-  // Hono on Bun uses the underlying req to upgrade
-  if (c.req.raw.headers.get("upgrade")?.toLowerCase() !== "websocket") {
-    return c.json({ error: "Expected WebSocket upgrade" }, 400);
+  const success = server.upgrade(c.req.raw);
+  if (success) {
+    return new Response(null);
   }
-  return c.body(null); // Placeholder — Bun upgrade handled below
+  return c.json({ error: "Expected WebSocket upgrade" }, 400);
 });
 
 const port = Number(process.env.PORT ?? "3000");
@@ -49,11 +48,14 @@ const server = Bun.serve({
 
   websocket: {
     open: (ws) => {
-      handleConnection(ws);
+      handleOpen(ws);
     },
     message(ws, msg) {
       // Echo or handle client messages
       ws.send(`Echo: ${msg}`);
+    },
+    close: (ws) => {
+      handleClose(ws);
     },
   },
 });
