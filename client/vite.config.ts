@@ -8,34 +8,34 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    VitePWA({
-      registerType: "autoUpdate",
-      includeAssets: ["favicon.svg"],
-      manifest: {
-        name: "PDRRMO Mesh — Emergency Communication",
-        short_name: "PDRRMO Mesh",
-        description:
-          "Disaster risk reduction mesh communication via Meshtastic LoRa radios",
-        theme_color: "#111827",
-        background_color: "#111827",
-        display: "standalone",
-        orientation: "portrait-primary",
-        start_url: "/",
-        icons: [
-          {
-            src: "icons/icon-192.svg",
-            sizes: "192x192",
-            type: "image/svg+xml",
-            purpose: "any",
-          },
-          {
-            src: "icons/icon-512.svg",
-            sizes: "512x512",
-            type: "image/svg+xml",
-            purpose: "any maskable",
-          },
-        ],
-      },
+      VitePWA({
+        registerType: "autoUpdate",
+        includeAssets: ["logo.png"],
+        manifest: {
+          name: "PDRRMO Mesh — Emergency Communication",
+          short_name: "PDRRMO Mesh",
+          description:
+            "Disaster risk reduction mesh communication via Meshtastic LoRa radios",
+          theme_color: "#111827",
+          background_color: "#111827",
+          display: "standalone",
+          orientation: "portrait-primary",
+          start_url: "/",
+          icons: [
+            {
+              src: "logo.png",
+              sizes: "512x512",
+              type: "image/png",
+              purpose: "any",
+            },
+            {
+              src: "logo.png",
+              sizes: "512x512",
+              type: "image/png",
+              purpose: "maskable",
+            },
+          ],
+        },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png}"],
         runtimeCaching: [
