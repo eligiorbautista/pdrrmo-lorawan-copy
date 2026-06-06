@@ -55,6 +55,10 @@ export function Map() {
   // This prevents Leaflet state residue from surviving across unmount/remount.
   const [mountKey] = useState(() => Math.random().toString(36).slice(2));
 
+  // Track when the Leaflet map instance is fully initialized so dependent
+  // effects (markers, panning, drag listeners) can safely attach.
+  const [isMapReady, setIsMapReady] = useState(false);
+
   // Get the user's own node
   const myNode = useMemo(() => {
     if (myNodeNum === null) return null;
@@ -152,32 +156,41 @@ export function Map() {
     mapRef.current = map;
     console.log("[Map] Leaflet map initialized");
 
+    // Invalidate size immediately after paint and again after CSS transitions settle
+    const rafId = requestAnimationFrame(() => {
+      map.invalidateSize();
+    });
     const timer = setTimeout(() => {
       map.invalidateSize();
       console.log("[Map] Map size invalidated");
-    }, 250);
+    }, 350);
+
+    setIsMapReady(true);
 
     return () => {
+      cancelAnimationFrame(rafId);
       clearTimeout(timer);
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
+        markersRef.current = {};
         console.log("[Map] Leaflet map destroyed");
       }
+      setIsMapReady(false);
     };
   }, []); // Run once on mount only
 
   // Update map view when center changes (only if user hasn't manually panned)
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || hasMovedRef.current || nodesWithPositions.length === 0) return;
+    if (!map || !isMapReady || hasMovedRef.current || nodesWithPositions.length === 0) return;
     map.setView(mapCenter, map.getZoom());
-  }, [mapCenter, nodesWithPositions.length]);
+  }, [mapCenter, nodesWithPositions.length, isMapReady]);
 
   // Listen to dragstart to mark user interaction
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !isMapReady) return;
 
     const handleUserInteraction = () => {
       hasMovedRef.current = true;
@@ -187,13 +200,13 @@ export function Map() {
     return () => {
       map.off("dragstart", handleUserInteraction);
     };
-  }, []);
+  }, [isMapReady]);
 
   // Update markers dynamically when nodes update
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) {
-      console.warn("[Map] Map ref not ready, skipping marker update");
+    if (!map || !isMapReady) {
+      if (!map) console.warn("[Map] Map ref not ready, skipping marker update");
       return;
     }
 
@@ -272,7 +285,7 @@ export function Map() {
     });
 
     console.log("[Map] Total markers on map:", Object.keys(markersRef.current).length);
-  }, [nodesWithPositions, myNodeNum]);
+  }, [nodesWithPositions, myNodeNum, isMapReady]);
 
   // Center on a specific node from the sidebar list
   const handleLocateNode = useCallback((node: MeshNode) => {
