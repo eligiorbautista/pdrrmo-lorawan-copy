@@ -78,7 +78,7 @@ export function Dashboard() {
           label="Mesh Nodes"
           value={nodeCount}
           detail={`${onlineNodes} online`}
-      icon={LogoIcon}
+          icon={Radio}
           tone="mesh"
         />
         <StatCard
