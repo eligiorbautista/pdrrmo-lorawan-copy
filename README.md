@@ -70,20 +70,23 @@ cd ../server
 bun install
 ```
 
-### 2. Configure environment variables
+### 2. Configure environment variables (REQUIRED before starting)
 
-Both the client and server use `.env` files for configuration. Example templates are provided.
+Both the client and server require `.env` files. You **must** create them from the provided templates **before** starting the dev servers.
 
 ```bash
 # From the project root
+
+# Client — copy template and remove the .example extension
 cd client
 cp .env.example .env
 
+# Server — copy template and remove the .example extension
 cd ../server
 cp .env.example .env
 ```
 
-The default values in `.env.example` work for local development out of the box. For production deployment, update these values accordingly.
+> **Important:** After copying, open each `.env` file and update any variables needed for your environment. The defaults work for local development, but you should still verify them (e.g., `VITE_WS_URL`, `VITE_API_URL`, `PORT`, `CORS_ORIGINS`) before running the servers.
 
 #### Client (`client/.env`)
 
