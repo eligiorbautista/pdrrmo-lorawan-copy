@@ -31,9 +31,12 @@ export function Layout() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h1 className="text-lg font-bold tracking-tight">
-            <span className="text-mesh-green">PDRRMO</span> Mesh
-          </h1>
+          <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="PDRRMO Logo" className="w-8 h-8 object-contain" />
+            <h1 className="text-lg font-bold tracking-tight">
+              <span className="text-mesh-green">PDRRMO</span> Mesh
+            </h1>
+          </div>
         </div>
 
         <ConnectionStatus />
