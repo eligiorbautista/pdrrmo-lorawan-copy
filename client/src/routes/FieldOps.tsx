@@ -1,4 +1,4 @@
-import { Radio, MessageSquare, Users } from "lucide-react";
+import { Radio, Mail, Users } from "lucide-react";
 import { NodeList } from "@/components/NodeList";
 import { MessageThread } from "@/components/MessageThread";
 import { EmergencyButton } from "@/components/EmergencyButton";
@@ -29,7 +29,7 @@ export function FieldOps() {
         </ContentPanel>
 
         {/* Messages section */}
-        <ContentPanel title="Messages" icon={MessageSquare}>
+        <ContentPanel title="Messages" icon={Mail}>
           <MessageThread />
         </ContentPanel>
       </div>
