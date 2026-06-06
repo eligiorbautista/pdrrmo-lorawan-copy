@@ -8,6 +8,7 @@ import {
   ArrowRight,
   ArrowLeft,
   MapPin,
+  Mail,
 } from "lucide-react";
 import { LogoIcon } from "@/components/LogoIcon";
 import { useDeviceStore } from "@/store/deviceStore";
@@ -85,7 +86,7 @@ export function Dashboard() {
           label="Messages"
           value={messages.length}
           detail="Total"
-          icon={MessageSquare}
+          icon={Mail}
           tone="info"
         />
         <StatCard
