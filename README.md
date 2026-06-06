@@ -36,6 +36,7 @@ A Progressive Web App for PDRRMO (Provincial Disaster Risk Reduction and Managem
 - **Send/receive text messages** on the mesh network
 - **Emergency button** — one-tap alert to command center with GPS location
 - **Node discovery** — view nearby Meshtastic nodes with position and battery info
+- **Node map** — view discovered nodes on an interactive Leaflet map with status indicators and GPS locations, allowing browser location sharing to update the device's hardware position
 - **Offline-capable** — PWA with service worker, IndexedDB persistence
 
 ### Command Center (Backend)
@@ -125,6 +126,7 @@ pdrrmo-lorawan/
 │   │   │   └── types.ts            # App type definitions
 │   │   ├── routes/                  # Page components
 │   │   │   ├── FieldOps.tsx         # Field agent view
+│   │   │   ├── Map.tsx              # Interactive node map (Leaflet)
 │   │   │   ├── Dashboard.tsx        # Command center overview
 │   │   │   └── Dispatch.tsx         # Alert dispatch queue
 │   │   ├── store/                   # Zustand state stores
