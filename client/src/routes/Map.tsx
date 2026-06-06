@@ -63,17 +63,27 @@ export function Map() {
 
   // Check if a node has a valid GPS position
   const hasValidPosition = useCallback((node: MeshNode | null): boolean => {
-    if (!node?.position) return false;
+    if (!node) {
+      console.log("[Map] hasValidPosition: node is null");
+      return false;
+    }
+    if (!node.position) {
+      console.log("[Map] hasValidPosition: node", node.shortName, "has no position");
+      return false;
+    }
     const lat = node.position.latitude;
     const lng = node.position.longitude;
-    return (
+    const valid =
       typeof lat === "number" &&
       typeof lng === "number" &&
       !isNaN(lat) &&
       !isNaN(lng) &&
       lat !== 0 &&
-      lng !== 0
-    );
+      lng !== 0;
+    if (!valid) {
+      console.log("[Map] hasValidPosition: node", node.shortName, "position invalid", { lat, lng });
+    }
+    return valid;
   }, []);
 
   // Get nodes that have valid GPS positions
@@ -126,6 +136,8 @@ export function Map() {
     // Clean any Leaflet residue from previous mounts
     container.innerHTML = "";
 
+    console.log("[Map] Initializing Leaflet map at", mapCenter, "zoom", DEFAULT_ZOOM);
+
     const map = L.map(container, {
       zoomControl: false,
     }).setView(mapCenter, DEFAULT_ZOOM);
@@ -138,9 +150,11 @@ export function Map() {
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
     mapRef.current = map;
+    console.log("[Map] Leaflet map initialized");
 
     const timer = setTimeout(() => {
       map.invalidateSize();
+      console.log("[Map] Map size invalidated");
     }, 250);
 
     return () => {
@@ -148,6 +162,7 @@ export function Map() {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
+        console.log("[Map] Leaflet map destroyed");
       }
     };
   }, []); // Run once on mount only
@@ -177,7 +192,20 @@ export function Map() {
   // Update markers dynamically when nodes update
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map) {
+      console.warn("[Map] Map ref not ready, skipping marker update");
+      return;
+    }
+
+    console.log("[Map] nodes in store:", nodes.size);
+    console.log("[Map] nodesWithPositions:", nodesWithPositions.length);
+    if (nodesWithPositions.length > 0) {
+      console.log(
+        "[Map] first positioned node:",
+        nodesWithPositions[0].shortName,
+        nodesWithPositions[0].position,
+      );
+    }
 
     const activeNodeNums = new Set<number>();
 
@@ -218,6 +246,7 @@ export function Map() {
         marker.setLatLng([latitude, longitude]);
         marker.setPopupContent(markerContent);
         marker.setIcon(customIcon);
+        console.log("[Map] Updated marker for", node.shortName);
       } else {
         const marker = L.marker([latitude, longitude], { icon: customIcon })
           .addTo(map)
@@ -228,6 +257,7 @@ export function Map() {
         });
 
         markersRef.current[node.nodeNum] = marker;
+        console.log("[Map] Created marker for", node.shortName, "at", latitude, longitude);
       }
     });
 
@@ -237,8 +267,11 @@ export function Map() {
       if (!activeNodeNums.has(nodeNum)) {
         markersRef.current[nodeNum].remove();
         delete markersRef.current[nodeNum];
+        console.log("[Map] Removed stale marker for node", nodeNum);
       }
     });
+
+    console.log("[Map] Total markers on map:", Object.keys(markersRef.current).length);
   }, [nodesWithPositions, myNodeNum]);
 
   // Center on a specific node from the sidebar list
