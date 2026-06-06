@@ -55,9 +55,12 @@ A Progressive Web App for PDRRMO (Provincial Disaster Risk Reduction and Managem
 
 ## Quick Start
 
-### 1. Install dependencies
+### 1. Clone and install dependencies
 
 ```bash
+git clone https://github.com/Yano-ai/pdrrmo-lorawan.git
+cd pdrrmo-lorawan
+
 # Install client dependencies
 cd client
 bun install
@@ -67,7 +70,39 @@ cd ../server
 bun install
 ```
 
-### 2. Start the development server
+### 2. Configure environment variables
+
+Both the client and server use `.env` files for configuration. Example templates are provided.
+
+```bash
+# From the project root
+cd client
+cp .env.example .env
+
+cd ../server
+cp .env.example .env
+```
+
+The default values in `.env.example` work for local development out of the box. For production deployment, update these values accordingly.
+
+#### Client (`client/.env`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_WS_URL` | `ws://localhost:3000/api/ws` | Backend WebSocket endpoint for real-time updates |
+| `VITE_API_URL` | `http://localhost:3000/api` | Backend REST API base URL |
+
+#### Server (`server/.env`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3000` | HTTP server port |
+| `HOST` | `0.0.0.0` | Bind address |
+| `DB_PATH` | `./pdrrmo.db` | SQLite database file path |
+| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:4173` | Comma-separated allowed origins for CORS |
+| `GATEWAY_URL` | — | Optional external gateway URL (e.g., LoRaWAN network server) |
+
+### 3. Start the development server
 
 ```bash
 # Terminal 1: Start the PWA frontend
@@ -100,6 +135,7 @@ bun dev
 ```
 pdrrmo-lorawan/
 ├── client/                          # React PWA (frontend)
+│   ├── .env.example                 # Client environment template
 │   ├── src/
 │   │   ├── components/              # Reusable UI components
 │   │   │   ├── AlertCard.tsx         # Alert notification card
@@ -108,8 +144,10 @@ pdrrmo-lorawan/
 │   │   │   ├── ErrorBoundary.tsx     # React error boundary
 │   │   │   ├── InstallPrompt.tsx     # PWA install prompt
 │   │   │   ├── Layout.tsx           # App shell with navigation
+│   │   │   ├── LogoIcon.tsx         # App logo component
 │   │   │   ├── MessageThread.tsx    # Chat interface
 │   │   │   ├── NodeList.tsx         # Connected nodes list
+│   │   │   ├── PageWrapper.tsx      # Uniform page layout wrapper
 │   │   │   └── Toast.tsx            # Toast notifications
 │   │   ├── hooks/                   # Custom React hooks
 │   │   │   ├── useEmergency.ts      # Emergency alert + retry logic
@@ -122,13 +160,14 @@ pdrrmo-lorawan/
 │   │   ├── lib/                     # Utility modules
 │   │   │   ├── db.ts               # IndexedDB persistence
 │   │   │   ├── emergency.ts        # Emergency message format
+│   │   │   ├── env.ts              # Environment variable validation
 │   │   │   ├── meshtastic.ts       # MeshDevice initialization
 │   │   │   └── types.ts            # App type definitions
 │   │   ├── routes/                  # Page components
-│   │   │   ├── FieldOps.tsx         # Field agent view
-│   │   │   ├── Map.tsx              # Interactive node map (Leaflet)
 │   │   │   ├── Dashboard.tsx        # Command center overview
-│   │   │   └── Dispatch.tsx         # Alert dispatch queue
+│   │   │   ├── Dispatch.tsx         # Alert dispatch queue
+│   │   │   ├── FieldOps.tsx         # Field agent view
+│   │   │   └── Map.tsx              # Interactive node map (Leaflet)
 │   │   ├── store/                   # Zustand state stores
 │   │   │   ├── deviceStore.ts       # Device + connection state
 │   │   │   └── messageStore.ts      # Messages + alerts state
@@ -136,6 +175,7 @@ pdrrmo-lorawan/
 │   │   └── main.tsx                 # Entry point
 │   └── public/                      # Static assets + PWA manifest
 ├── server/                          # Bun + Hono backend
+│   ├── .env.example                 # Server environment template
 │   └── src/
 │       ├── db/                      # Database layer
 │       │   ├── schema.ts           # SQLite schema + init
@@ -155,20 +195,26 @@ pdrrmo-lorawan/
 
 ## Environment Variables
 
-### Client (`client/`)
+Configuration is centralized via `.env` files in both the `client/` and `server/` directories. Copy `.env.example` to `.env` in each directory and customize as needed.
+
+> **Note:** `.env` files are gitignored. Never commit secrets or production credentials. Use `.env.example` as a template.
+
+### Client (`client/.env`)
 
 | Variable | Default | Description |
 |---|---|---|
-| `VITE_WS_URL` | `ws://localhost:3000/api/ws` | Command center WebSocket URL |
+| `VITE_WS_URL` | `ws://localhost:3000/api/ws` | Backend WebSocket endpoint for real-time mesh updates |
+| `VITE_API_URL` | `http://localhost:3000/api` | Backend REST API base URL |
 
-### Server (`server/`)
+### Server (`server/.env`)
 
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `3000` | HTTP server port |
 | `HOST` | `0.0.0.0` | Bind address |
 | `DB_PATH` | `./pdrrmo.db` | SQLite database file path |
-| `GATEWAY_URL` | — | Meshtastic gateway node HTTP URL |
+| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:4173` | Comma-separated allowed origins for CORS |
+| `GATEWAY_URL` | — | Optional external gateway URL (e.g., LoRaWAN network server) |
 
 ## Browser Compatibility
 
