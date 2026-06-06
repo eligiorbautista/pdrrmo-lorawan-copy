@@ -178,6 +178,12 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-text-tertiary);
   }
+
+  /* Tailwind preflight resets button cursor to default — restore pointer */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 /* ============================================
