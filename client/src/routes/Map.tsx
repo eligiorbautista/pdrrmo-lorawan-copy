@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
@@ -10,7 +10,6 @@ import {
 import { useDeviceStore } from "@/store/deviceStore";
 import { useMeshtastic } from "@/hooks/useMeshtastic";
 import type { MeshNode } from "@/lib/types";
-
 
 // Helper to create glowing pulsing custom HTML pins for Leaflet
 const createCustomMarkerIcon = (isMe: boolean, shortName: string) => {
@@ -43,11 +42,18 @@ export function Map() {
   const { isConnected, connect, phase } = useMeshtastic();
   const nodes = useDeviceStore((s) => s.nodes);
   const myNodeNum = useDeviceStore((s) => s.myNodeNum);
+
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Record<number, L.Marker>>({});
+  const hasMovedRef = useRef(false);
 
   const [selectedNodeNum, setSelectedNodeNum] = useState<number | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // Mount key: forces React to create a fresh DOM element on every mount.
+  // This prevents Leaflet state residue from surviving across unmount/remount.
+  const [mountKey] = useState(() => Math.random().toString(36).slice(2));
 
   // Get the user's own node
   const myNode = useMemo(() => {
@@ -56,7 +62,7 @@ export function Map() {
   }, [nodes, myNodeNum]);
 
   // Check if a node has a valid GPS position
-  const hasValidPosition = (node: MeshNode | null): boolean => {
+  const hasValidPosition = useCallback((node: MeshNode | null): boolean => {
     if (!node?.position) return false;
     const lat = node.position.latitude;
     const lng = node.position.longitude;
@@ -68,26 +74,23 @@ export function Map() {
       lat !== 0 &&
       lng !== 0
     );
-  };
+  }, []);
 
-  // Get nodes that have valid GPS positions (excluding my node for average)
+  // Get nodes that have valid GPS positions
   const nodesWithPositions = useMemo(() => {
     return Array.from(nodes.values()).filter((node) => hasValidPosition(node));
-  }, [nodes]);
+  }, [nodes, hasValidPosition]);
 
   // Get nodes that DO NOT have valid GPS positions
   const nodesWithoutPositions = useMemo(() => {
     return Array.from(nodes.values()).filter((node) => !hasValidPosition(node));
-  }, [nodes]);
+  }, [nodes, hasValidPosition]);
 
   // Compute map center: prioritize user's own GPS, then average of others, then default
   const mapCenter = useMemo((): [number, number] => {
-    // 1. Use user's own device GPS if available
     if (hasValidPosition(myNode)) {
       return [myNode!.position!.latitude, myNode!.position!.longitude];
     }
-
-    // 2. Fall back to average of all positioned nodes
     if (nodesWithPositions.length === 0) return DEFAULT_CENTER;
     let totalLat = 0;
     let totalLng = 0;
@@ -113,13 +116,17 @@ export function Map() {
       isNaN(avgLat) ? DEFAULT_CENTER[0] : avgLat,
       isNaN(avgLng) ? DEFAULT_CENTER[1] : avgLng,
     ];
-  }, [myNode, nodesWithPositions]);
+  }, [myNode, nodesWithPositions, hasValidPosition]);
 
-  // Initialize Map
+  // Initialize Map — runs once on mount, cleanup on unmount
   useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
+    const container = mapContainerRef.current;
+    if (!container || mapRef.current) return;
 
-    const map = L.map(mapContainerRef.current, {
+    // Clean any Leaflet residue from previous mounts
+    container.innerHTML = "";
+
+    const map = L.map(container, {
       zoomControl: false,
     }).setView(mapCenter, DEFAULT_ZOOM);
 
@@ -143,19 +150,13 @@ export function Map() {
         mapRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected]);
+  }, []); // Run once on mount only
 
-  // Update map view when average center changes
-  const hasMovedRef = useRef(false);
+  // Update map view when center changes (only if user hasn't manually panned)
   useEffect(() => {
-    if (
-      mapRef.current &&
-      !hasMovedRef.current &&
-      nodesWithPositions.length > 0
-    ) {
-      mapRef.current.setView(mapCenter, mapRef.current.getZoom());
-    }
+    const map = mapRef.current;
+    if (!map || hasMovedRef.current || nodesWithPositions.length === 0) return;
+    map.setView(mapCenter, map.getZoom());
   }, [mapCenter, nodesWithPositions.length]);
 
   // Listen to dragstart to mark user interaction
@@ -230,7 +231,7 @@ export function Map() {
       }
     });
 
-    // Remove stale markers
+    // Remove stale markers (nodes that no longer exist or lost position data)
     Object.keys(markersRef.current).forEach((key) => {
       const nodeNum = Number(key);
       if (!activeNodeNums.has(nodeNum)) {
@@ -240,7 +241,21 @@ export function Map() {
     });
   }, [nodesWithPositions, myNodeNum]);
 
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  // Center on a specific node from the sidebar list
+  const handleLocateNode = useCallback((node: MeshNode) => {
+    if (!mapRef.current || !node.position) return;
+    hasMovedRef.current = true;
+    setSelectedNodeNum(node.nodeNum);
+    mapRef.current.setView(
+      [node.position.latitude, node.position.longitude],
+      15,
+    );
+    const marker = markersRef.current[node.nodeNum];
+    if (marker) {
+      marker.openPopup();
+    }
+    setMobileSidebarOpen(false);
+  }, []);
 
   if (!isConnected) {
     return (
@@ -326,21 +341,9 @@ export function Map() {
                 nodesWithPositions.map((node) => {
                   const isSelected = selectedNodeNum === node.nodeNum;
                   return (
-                      <button
+                    <button
                       key={node.nodeNum}
-                      onClick={() => {
-                        // eslint-disable-next-line react-hooks/refs
-                        if (!mapRef.current || !node.position) return;
-                        hasMovedRef.current = true;
-                        setSelectedNodeNum(node.nodeNum);
-                        mapRef.current.setView(
-                          [node.position.latitude, node.position.longitude],
-                          15,
-                        );
-                        const marker = markersRef.current[node.nodeNum];
-                        if (marker) marker.openPopup();
-                        setMobileSidebarOpen(false);
-                      }}
+                      onClick={() => handleLocateNode(node)}
                       className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all flex items-center gap-3 hover:translate-x-0.5 duration-150 ${
                         isSelected
                           ? "bg-mesh/10 border-mesh/30 shadow-lg shadow-mesh/5"
@@ -462,7 +465,12 @@ export function Map() {
           <Menu className="w-5 h-5" aria-hidden="true" />
         </button>
 
-        <div ref={mapContainerRef} className="w-full h-full" id="map-container" />
+        {/* mountKey forces React to create a fresh DOM element on every mount */}
+        <div
+          key={mountKey}
+          ref={mapContainerRef}
+          className="w-full h-full"
+        />
       </div>
     </div>
   );
