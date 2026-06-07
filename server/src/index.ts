@@ -34,7 +34,11 @@ app.use(
   }),
 );
 
-// Health check
+// Health checks
+app.get("/healthcheck", (c) =>
+  c.json({ status: "ok", timestamp: new Date().toISOString() }),
+);
+
 app.get("/api/health", (c) =>
   c.json({ status: "ok", timestamp: new Date().toISOString() }),
 );
