@@ -1,0 +1,27 @@
+app = "pdrrmo-server"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[mounts]
+  source = "pdrrmo_data"
+  destination = "/app/data"
+
+[env]
+  PORT = "3000"
+  HOST = "0.0.0.0"
+  DB_PATH = "./data/pdrrmo.db"
+  CORS_ORIGINS = "https://your-frontend.vercel.app"
